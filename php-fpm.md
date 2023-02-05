@@ -4,9 +4,6 @@
 
 ### FastCGI, worker request handling
 
-- **Bug**: main / fcgi - investigate if file uploads can cause disk space exhaustion
-  - https://bugs.php.net/bug.php?id=75889 - Overloading disk with temporary files
-  - https://bugs.php.net/bug.php?id=70620 php-fpm can interrupt sapi_deactivate cleanup (Security bug - exposed by the #75889)
 - **Bug**: main - correctly decode path_info before comparing to comply with cgi spec
   - https://bugs.php.net/bug.php?id=74129 - Incorrect SCRIPT_NAME with apache ProxyPassMatch when spaces are in path
 - **Bug**: main - verify the PATH_TRANSLATED logic with cgi.fix_pathinfo
@@ -25,6 +22,12 @@
   - https://bugs.php.net/bug.php?id=76922 - FastCGI terminates connection immediately after FCGI_GET_VALUES
 - **Bug**: fcgi - FCGI_ABORT_REQUEST from the client (web server) seems to be ignored
   - https://bugs.php.net/bug.php?id=76419 - connection_aborted() under FPM doesn't work properly
+- **Bug**: fcgi / main - Check logic around flushing after using fastcgi_finish_request()
+  - https://github.com/php/php-src/issues/9741 - flush() halts script after fastcgi_finish_request()
+- **Bug**: fcgi - Investigate deadlock for keepalive connection after fastcgi_finish_request()
+  - https://github.com/php/php-src/issues/10335 - FPM: keepalived connection with fastcgi_finish_request causes dead lock
+- **Feat**: fcgi / main - look to support for close parameter in fastcgi_finish_request
+  - https://github.com/php/php-src/pull/10273 - FPM: fastcgi_finish_request supports force close connection param
 - **Feat**: fcgi - flag to allow missing content length
   - https://github.com/php/php-src/pull/7509 - discussion
 - **Feat**: fcgi / main - refactore processing of fcgi env vars
@@ -44,10 +47,6 @@
 
 ### Logging, tracing and socket
 
-- **Bug**: access log - Investigate why supress path on /status does not work
-  - https://github.com/php/php-src/issues/10116 - /status is not suppressed effectively when using access.suppress_path
-- **Bug**: access log - fpm_log_format needs cleanup
-  - https://bugs.php.net/bug.php?id=75635 - Memory leak in fpm log
 - **Bug**: error log - check how changes is error log file permission impacts IP and time logged
   - https://bugs.php.net/bug.php?id=62660 - PHP error logging with FPM fails to display an IP address and correct time
 - **Bug**: error log - Investigate why error goes to stderr instead of error log file
@@ -64,6 +63,8 @@
   - https://bugs.php.net/bug.php?id=62951 - Log utime and stime (patch)
 - **Feat**: access log - fmt flag for path info or available env to use
   - https://bugs.php.net/bug.php?id=81670 - Access log contains wrong values for "%r" (request URI) format string
+- **Feat**: access log - Allow suppression of queries
+  - https://github.com/php/php-src/issues/10116 - /status?json&full is not suppressed when access.suppress_path used
 - **Feat**: access log - long lines support - using the same logic as zlog ideally
   - https://github.com/php/php-src/pull/5634 - PR to discussiong it and removing unused MAX_LINE_LENGTH
 - **Feat**: log - allow separation access and error log to stdout and stderr
@@ -100,8 +101,6 @@
 
 ### Status and config
 
-- **Bug**: scoreboard - slow request causing counter reset
-  - https://bugs.php.net/bug.php?id=70645 - Resetting counters on status page
 - **Bug**: status - JSON and XML output is not escaped and can be invalid
   - https://bugs.php.net/bug.php?id=69250 - PHP FPM status report produces invalid JSON and XML
   - https://bugs.php.net/bug.php?id=64539 - FPM status page: query_string not properly JSON encoded
@@ -184,13 +183,15 @@
   - https://bugs.php.net/bug.php?id=55322 - Apache : TRANSLATED_PATH doesn't consider chroot
 - **Bug**: systemd - check how PrivateTmp should work with chroot
   - https://bugs.php.net/bug.php?id=73466 - systemd option PrivateTmp= having no effect for a pool that is chrooted.
+- **Bug**: systemd - check strange output of the fpm process line in systemd (only some version of it)
+  - https://github.com/php/php-src/issues/10204 - Weird systemctl status phpX.Y-fpm output on Ubuntu 22.04
 - **Feat**: systemd - Add CapabilityBoundingSet
   - https://github.com/php/php-src/pull/4960 - Add CapabilityBoundingSet to systemd unit file (my PR)
 - **Bug**: signal - sigpipe might cause fpm to be unresponsive
   - https://bugs.php.net/bug.php?id=67320 - Ignored sigpipes in php-fpm cause php to become unresponsive
 - **Feat**: signal: consider changing SIGTERM for primary idle killing instead of SIGQUIT
   - https://github.com/php/php-src/blob/8f02d7b7e499490312969cdfa9a3a81b9458595a/sapi/fpm/fpm/fpm_process_ctl.c#L138-L139
-- **Bug**: event - Check for the maximum file descriptors in devpoll
+- **Bug**: event - check for the maximum file descriptors in devpoll
   - https://bugs.php.net/bug.php?id=65774 - no max file descriptor check for events.mechanism = /dev/poll
 - **Bug**: event - FreeBSD kqueue time outs
   - https://bugs.php.net/bug.php?id=76630 - php-fpm time outs unexpectedly
@@ -255,8 +256,7 @@
 
 ## Feedback required
 
-- https://github.com/php/php-src/issues/9792 - ALERT: oops, unknown child (103) exited with code 0
-- https://github.com/php/php-src/issues/9438 - ALERT: oops, unknown child (?) exited with code 32
+
 - https://github.com/php/php-src/issues/8646 - Core: Memory leak PHP FPM 8.1 ARM64
 - https://bugs.php.net/bug.php?id=73313 - over fpm does not respect in .user.ini engine off directive
 - https://bugs.php.net/bug.php?id=76224 - Error and shutdown handlers triggered on object destroy
@@ -291,6 +291,18 @@
 
 ## Changes
 
+### 2023-02
+
+- **Bug**: main / fcgi - investigate if file uploads can cause disk space exhaustion
+  - https://bugs.php.net/bug.php?id=75889 - Overloading disk with temporary files
+  - https://bugs.php.net/bug.php?id=70620 php-fpm can interrupt sapi_deactivate cleanup (Security bug - exposed by the #75889)
+- **Bug**: event - Re-classify unknown child alert
+  - https://github.com/php/php-src/issues/10315 - FPM unknown child alert not valid
+  - https://github.com/php/php-src/issues/10258 - Unknown child (SOME_ID)
+  - https://github.com/php/php-src/issues/9792 - ALERT: oops, unknown child (103) exited with code 0
+  - https://github.com/php/php-src/issues/9438 - ALERT: oops, unknown child (?) exited with code 32
+- **Bug**: scoreboard - slow request causing counter reset
+  - https://bugs.php.net/bug.php?id=70645 - Resetting counters on status page
 ### 2023-01
 
 - **Bug**: proc - fix the comment in www.conf to better clarify user, group, listen.user and listen.group (possibly also check docs correctness)
